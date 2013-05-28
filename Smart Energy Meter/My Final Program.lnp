@@ -1,0 +1,7 @@
+"main.obj",
+"lcd.obj",
+"Keyboard.obj",
+"delay.obj",
+"gsm.obj" 
+TO "My Final Program" 
+RAMSIZE(256) 

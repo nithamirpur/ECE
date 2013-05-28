@@ -1,0 +1,109 @@
+C51 COMPILER V9.51   LCD                                                                   04/21/2013 20:19:36 PAGE 1   
+
+
+C51 COMPILER V9.51, COMPILATION OF MODULE LCD
+OBJECT MODULE PLACED IN lcd.OBJ
+COMPILER INVOKED BY: C:\Keil\C51\BIN\C51.EXE lcd.c BROWSE DEBUG OBJECTEXTEND TABS(2)
+
+line level    source
+
+   1          //#pragma compact
+   2          #include<delay.h>
+   3          #include<reg51.h>
+   4          
+   5          // Port Initialization
+   6          
+   7          #define DATAPORT P0            // Port 2 is utilize for sending command and data
+   8          sbit E=P1^0;          //  Enable pin
+   9          sbit RS=P1^1;         //  Register select
+  10          sbit RW=P1^2;        // Read write
+  11          sbit CHK=P0^7;
+  12          // Function Definition
+  13          
+  14          void ready(void)
+  15          {
+  16   1      RS=0;
+  17   1      RW=1;
+  18   1      E=0;
+  19   1      delay(150);
+  20   1      E=1;
+  21   1      while(CHK==1)
+  22   1      {
+  23   2      E=0;
+  24   2      delay(150);
+  25   2      E=1;
+  26   2      }
+  27   1      }
+  28          
+  29          void writecmd(int z)
+  30          {
+  31   1      ready();
+  32   1      RS=0;          // Register selected for 
+  33   1      RW=0;
+  34   1      DATAPORT=z;
+  35   1      E=1;
+  36   1      delay(150);
+  37   1      E=0;
+  38   1      delay(150);
+  39   1      }
+  40          
+  41          void writedata(char c)
+  42          {
+  43   1      ready();
+  44   1      RS=1;
+  45   1      RW=0;
+  46   1      DATAPORT=c;
+  47   1      E=1;
+  48   1      delay(150);
+  49   1      E=0;
+  50   1      delay(150);
+  51   1      }
+  52          
+  53          void string_print(char *s)
+  54          {
+  55   1      int i=0,j=0;
+C51 COMPILER V9.51   LCD                                                                   04/21/2013 20:19:36 PAGE 2   
+
+  56   1      while(s[i]!='\0')
+  57   1      {
+  58   2      if(j==15)
+  59   2      {
+  60   3      writecmd(0xC0);
+  61   3      j=0;
+  62   3      }
+  63   2      writedata(s[i]);
+  64   2      writecmd(0x06);
+  65   2      i++;
+  66   2      j++;
+  67   2      }
+  68   1      }
+  69          
+  70          void lcdinit(void)
+  71          {
+  72   1      delay(15000);
+  73   1      writecmd(0x30);
+  74   1      delay(4500);
+  75   1      writecmd(0x30);
+  76   1      delay(300);
+  77   1      writecmd(0x30);
+  78   1      delay(650);
+  79   1      writecmd(0x38);
+  80   1      writecmd(0x0c);
+  81   1      writecmd(0x01);
+  82   1      writecmd(0x0E);
+  83   1      }
+  84          
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    250    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----      10
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

@@ -1,0 +1,663 @@
+C51 COMPILER V9.51   MAIN                                                                  04/21/2013 20:19:36 PAGE 1   
+
+
+C51 COMPILER V9.51, COMPILATION OF MODULE MAIN
+OBJECT MODULE PLACED IN main.OBJ
+COMPILER INVOKED BY: C:\Keil\C51\BIN\C51.EXE main.c BROWSE DEBUG OBJECTEXTEND TABS(2)
+
+line level    source
+
+   1          //#pragma compact
+   2          #include<reg51.h>
+   3          #include<LCD.h>
+   4          #include<keyboard.h>
+   5          #include<gsm.h>
+   6          #include<delay.h>
+   7          #include<stdlib.h>
+   8          #include<string.h>
+   9          
+  10          
+  11          // Data Initialization
+  12          char lastkey,send='0';
+  13          unsigned int limit,i=0,count=0,reading=0,kwh=2,min=0,hr=0,sec=0,a=0,day=1,month=1,year=2013,track=0,temp=0
+             -,b=0,sms=0;
+  14          unsigned char MyBuff[15],unit[2],del,k=0,NewMessage=0;
+  15          const unsigned char code Response[]="+CMTI";
+  16          // Port Initialization
+  17          
+  18          sbit cuty=P1^3;
+  19          
+  20          // Function Decleration
+  21          void set_time(void);
+  22          void set_limit(void);
+  23          void convert(unsigned int count, int p);
+  24          void read_notification(void);
+  25          void clear_mybuff(void);
+  26          void set_date(void);
+  27          void creatmsg(void);
+  28          
+  29          // Interrupt Service Routine
+  30          
+  31          //------------------- Interrupt INT0 Service Routine -----------------------------------------------------
+             -----
+  32          
+  33          void counter() interrupt 0
+  34          {
+  35   1        count++;                                      // count the pulse comming from the Energy meter
+  36   1           if(count==1000)
+  37   1           {
+  38   2           reading++;                                   // Keep track of Kw
+  39   2           count=0;
+  40   2           }
+  41   1       
+  42   1      }
+  43          
+  44           //----------------------------------- Interrupt TF0 Service Routine--------------------------------------
+             ------ 
+  45           
+  46           void timer() interrupt 1
+  47           {
+  48   1         
+  49   1         TF0=0;
+  50   1         TR0=0;
+  51   1         TH0=0x4B;
+  52   1         TL0=0xFE;
+C51 COMPILER V9.51   MAIN                                                                  04/21/2013 20:19:36 PAGE 2   
+
+  53   1         TR0=1;
+  54   1         a++;
+  55   1         if(a==20)
+  56   1         {
+  57   2         sec++;
+  58   2         a=0;
+  59   2         if(sec==60)
+  60   2         {
+  61   3         sec=0;
+  62   3         min++;
+  63   3         sms++;
+  64   3         if(sms==1)
+  65   3           send='1';
+  66   3         if(min==60)
+  67   3         {
+  68   4        hr++;
+  69   4        min=0;
+  70   4        kwh=kwh+(reading-kwh);
+  71   4        if(hr==24)
+  72   4         { 
+  73   5          hr=0;
+  74   5          day++;
+  75   5         }
+  76   4         }
+  77   3         }
+  78   2         }
+  79   1         }
+  80          //--------------------------------- Interrupt Service  Routine for Tempering------------------------------
+             -------------------------------
+  81             void tempering() interrupt 2
+  82             {
+  83   1           cuty=0;
+  84   1           temp=1;
+  85   1         }
+  86          //--------------------------------- Interrupt Service Routine For Serial Communication--------------------
+             ---------------------------------------
+  87          
+  88          void receive(void) interrupt 4
+  89             {
+  90   1           unsigned char ch;
+  91   1           if(RI==1)
+  92   1           {
+  93   2             RI=0;
+  94   2             ch=SBUF;
+  95   2             if(ch==Response[k] || (k>4)) // if received character matches or k>4 which means you already have righ
+             -t string
+  96   2             {
+  97   3               if(ch !=0x0D)
+  98   3               {
+  99   4                MyBuff[k++]=ch;    // data received store data
+ 100   4                }
+ 101   3                else
+ 102   3                {
+ 103   4                  NewMessage=1;
+ 104   4                  MyBuff[k]='\0';   // data is received
+ 105   4                  k=0;              // Reset K 
+ 106   4                  }
+ 107   3              }
+ 108   2              else
+ 109   2              {
+ 110   3                  if (ch=='P')
+ 111   3                  {
+C51 COMPILER V9.51   MAIN                                                                  04/21/2013 20:19:36 PAGE 3   
+
+ 112   4                    cuty=0;
+ 113   4                    clear_mybuff();
+ 114   4                  }
+ 115   3                  if(ch=='K')
+ 116   3                  {
+ 117   4                    cuty=1;
+ 118   4                    clear_mybuff();
+ 119   4                    }
+ 120   3                k=0;  // There is miss match reset counter
+ 121   3              }
+ 122   2           } 
+ 123   1         }
+ 124          
+ 125          //------------------------------- Main Program---------------------------------------------
+ 126          
+ 127          int main()
+ 128          {
+ 129   1      int j;
+ 130   1      TH0=0x4B;
+ 131   1      TL0=0xFE;
+ 132   1      lcdinit();
+ 133   1      set_limit();
+ 134   1      //set_date();
+ 135   1      set_time();
+ 136   1      writecmd(0x01);
+ 137   1      TMOD=0x21;
+ 138   1      TH0=0x4B;
+ 139   1      TL0=0xFE;
+ 140   1      IT0=1;
+ 141   1      IE=0x87;
+ 142   1      init_serial();
+ 143   1      string_print("GSM Initializa-tion");
+ 144   1      delay1(10);
+ 145   1      writecmd(0x01);
+ 146   1      gsminit();
+ 147   1      string_print("GSM Initializa-tion Done");
+ 148   1      delay1(10);
+ 149   1      writecmd(0x01);
+ 150   1      TR0=1;
+ 151   1      writecmd(0x01);
+ 152   1      while(1)
+ 153   1      {
+ 154   2       if(temp==1)
+ 155   2       {
+ 156   3         temp=0;
+ 157   3         send_sms("Meter Is Tempered");
+ 158   3         writecmd(0x01);
+ 159   3         string_print("Meter Is tempe-");
+ 160   3         writecmd(0xC0);
+ 161   3         string_print("red");
+ 162   3         b=1;
+ 163   3       }
+ 164   2       if(limit < kwh && track!=1 && b==0)
+ 165   2       {
+ 166   3       send_sms("Limit Crossed");
+ 167   3       track=1;
+ 168   3       }
+ 169   2       if(limit==kwh && track!=1 && b==0)
+ 170   2       {
+ 171   3       send_sms("Limit Reached");
+ 172   3       track=1;
+ 173   3       }
+C51 COMPILER V9.51   MAIN                                                                  04/21/2013 20:19:36 PAGE 4   
+
+ 174   2       if( NewMessage==1)
+ 175   2        {
+ 176   3        NewMessage=0;
+ 177   3        read_notification();
+ 178   3        }
+ 179   2        if( b==0)
+ 180   2        {
+ 181   3        if( send=='1')
+ 182   3        {
+ 183   4          send='0';
+ 184   4          unit[0]=kwh+0x30;
+ 185   4          unit[1]='\0';
+ 186   4          send_sms(unit);
+ 187   4          delay(100);
+ 188   4          for(j=0;j<2;j++)
+ 189   4          unit[j]=0;
+ 190   4        }
+ 191   3       string_print("Reading");
+ 192   3       writecmd(0xc0);
+ 193   3       string_print("      ");
+ 194   3       convert(kwh,2);
+ 195   3       string_print("   KWh");
+ 196   3       delay1(300);
+ 197   3       writecmd(0x01);
+ 198   3       string_print("Time");
+ 199   3       writecmd(0xc0);
+ 200   3       string_print("   ");
+ 201   3       convert(hr,2);
+ 202   3       string_print(":");
+ 203   3       convert(min,2);
+ 204   3       string_print(":");
+ 205   3       convert(sec,2);
+ 206   3       delay1(300);
+ 207   3       writecmd(0x01);
+ 208   3       /*string_print("Date");
+ 209   3       writecmd(0xc0);
+ 210   3       string_print("   ");
+ 211   3       convert(day,2);
+ 212   3       string_print("/");
+ 213   3       convert(month,2);
+ 214   3       string_print("/");
+ 215   3       convert(year,4);
+ 216   3       delay1(200);
+ 217   3       writecmd(0x01);*/
+ 218   3       }
+ 219   2      }
+ 220   1      }
+ 221          
+ 222          //-------------------------- Set Time Function Definition -------------------------------
+ 223          
+ 224          void set_time(void)
+ 225          { int i=0;
+ 226   1        char key;
+ 227   1        char s[1]={0};
+ 228   1        string_print("Set time");
+ 229   1        delay1(200);
+ 230   1        writecmd(0x01);
+ 231   1        string_print("Enter Seconds");
+ 232   1        writecmd(0xC0);
+ 233   1        while(i<2)
+ 234   1       {
+ 235   2       key=read_switch();
+C51 COMPILER V9.51   MAIN                                                                  04/21/2013 20:19:36 PAGE 5   
+
+ 236   2       if(key!='n' && key!='A' && key!='B' && key!='C' && key!='D' && key!='E' && key!='F')
+ 237   2      {
+ 238   3      s[i]=key;
+ 239   3      writedata(key);
+ 240   3      writecmd(0x06);
+ 241   3      if(i==0 && key>='6')
+ 242   3      {
+ 243   4        writecmd(0x01);
+ 244   4        string_print(" Value < 6");
+ 245   4        delay1(200);
+ 246   4        writecmd(0x01);
+ 247   4        string_print("Enter Seconds");
+ 248   4        writecmd(0xC0);
+ 249   4        s[i]=0;
+ 250   4        i--;
+ 251   4      }
+ 252   3      i++;
+ 253   3      }
+ 254   2      else if(key=='C')
+ 255   2      {
+ 256   3      writecmd(0xC0);
+ 257   3      for(i=0;i<2;i++)
+ 258   3      s[i]=0;
+ 259   3      i=0;
+ 260   3      }
+ 261   2      }
+ 262   1      sec=atoi(s);
+ 263   1      for(i=0;i<2;i++)
+ 264   1      s[i]=0;
+ 265   1      i=0;
+ 266   1      writecmd(0x01);
+ 267   1      string_print("Enter Minutes");
+ 268   1      writecmd(0xC0);
+ 269   1      while(i<2)
+ 270   1      {
+ 271   2      key=read_switch();
+ 272   2      if(key!='n' && key!='A' && key!='B' && key!='C' && key!='D' && key!='E' && key!='F')
+ 273   2      {
+ 274   3      s[i]=key;
+ 275   3      writedata(key);
+ 276   3      writecmd(0x06);
+ 277   3      if(i==0 && key>='6')
+ 278   3      {
+ 279   4        writecmd(0x01);
+ 280   4        string_print(" Value < 6");
+ 281   4        delay1(200);
+ 282   4        writecmd(0x01);
+ 283   4        string_print("Enter Minutes");
+ 284   4        writecmd(0xC0);
+ 285   4        s[i]=0;
+ 286   4        i--;
+ 287   4      }
+ 288   3      i++;
+ 289   3      }
+ 290   2      else if(key=='C')
+ 291   2      {
+ 292   3      writecmd(0xC0);
+ 293   3      for(i=0;i<2;i++)
+ 294   3      s[i]=0;
+ 295   3      i=0;
+ 296   3      }
+ 297   2      }
+C51 COMPILER V9.51   MAIN                                                                  04/21/2013 20:19:36 PAGE 6   
+
+ 298   1      min=atoi(s);
+ 299   1      for(i=0;i<2;i++)
+ 300   1      s[i]=0;
+ 301   1      i=0;
+ 302   1      writecmd(0x01);
+ 303   1      string_print("Enter Hours");
+ 304   1      writecmd(0xC0);
+ 305   1      while(i<2)
+ 306   1      {
+ 307   2      key=read_switch();
+ 308   2      if(key!='n' && key!='A' && key!='B' && key!='C' && key!='D' && key!='E' && key!='F')
+ 309   2      {
+ 310   3      s[i]=key;
+ 311   3      writedata(key);
+ 312   3      writecmd(0x06);
+ 313   3        if( i==0 && key>='3')
+ 314   3      {
+ 315   4        writecmd(0x01);
+ 316   4        string_print(" Value < 3");
+ 317   4        delay1(200);
+ 318   4        writecmd(0x01);
+ 319   4        string_print("Enter Hours");
+ 320   4        writecmd(0xC0);
+ 321   4        s[i]=0;
+ 322   4        i--;
+ 323   4      }
+ 324   3      if( i==1 && key>='4' && s[i-1]=='2')
+ 325   3      {
+ 326   4        writecmd(0x01);
+ 327   4        string_print(" Value < 4");
+ 328   4        delay1(200);
+ 329   4        writecmd(0x01);
+ 330   4        string_print("Enter Hours");
+ 331   4        writecmd(0xC0);
+ 332   4        s[i]=0;
+ 333   4        i--;
+ 334   4        s[i]=0;
+ 335   4        i--;
+ 336   4      }
+ 337   3      i++;
+ 338   3      }
+ 339   2      else if(key=='C')
+ 340   2      {
+ 341   3      writecmd(0xC0);
+ 342   3      for(i=0;i<2;i++)
+ 343   3      s[i]=0;
+ 344   3      i=0;
+ 345   3      }
+ 346   2      }
+ 347   1      hr=atoi(s);
+ 348   1      }
+ 349          
+ 350          // ------------------------Set _limit Function definition-----------------------------------------
+ 351          
+ 352          void set_limit(void)
+ 353          {
+ 354   1      char key;
+ 355   1      char s[4]={0};
+ 356   1      int i=0;
+ 357   1      string_print("Enter limit");
+ 358   1      writecmd(0xc0);
+ 359   1      for(;i>=0;i--)
+C51 COMPILER V9.51   MAIN                                                                  04/21/2013 20:19:36 PAGE 7   
+
+ 360   1      s[i]=0;
+ 361   1      i++;
+ 362   1      while(i<4)
+ 363   1      {
+ 364   2      key=read_switch();
+ 365   2      if(key=='D')
+ 366   2      {
+ 367   3      writecmd(0x01);
+ 368   3      return;
+ 369   3      }
+ 370   2      else if(key!='n' && key!='E' && key!='C' && key!='A' && key!='B' && key!='D' && key!='F' )
+ 371   2      {
+ 372   3      s[i]=key;
+ 373   3      i++;
+ 374   3      writedata(key);
+ 375   3      writecmd(0x06);
+ 376   3      }
+ 377   2      else if(key=='C')
+ 378   2      {
+ 379   3      writecmd(0xC0);
+ 380   3      for(i=0;i<4;i++)
+ 381   3      s[i]=0;
+ 382   3      i=0;
+ 383   3      }
+ 384   2      }
+ 385   1      limit=atoi(s);
+ 386   1      writecmd(0x01);
+ 387   1      }
+ 388          
+ 389          // ------------------------------Convert function Decleration--------------------------------------
+ 390          
+ 391          void convert(unsigned int count, int p)
+ 392          {
+ 393   1      int i=0;
+ 394   1      if(p==2)
+ 395   1      {
+ 396   2      char s[2]={0};
+ 397   2      while(count>0)
+ 398   2      {
+ 399   3      s[i]=(count%10);
+ 400   3      count=(count/10);
+ 401   3      i++;
+ 402   3      }
+ 403   2      for(i=1;i>=0;i--)
+ 404   2      {
+ 405   3      writedata(s[i]+0x30);
+ 406   3      writecmd(0x06);
+ 407   3      }
+ 408   2      }
+ 409   1      else
+ 410   1      {
+ 411   2        char s[4]={0};
+ 412   2      while(count>0)
+ 413   2      {
+ 414   3      s[i]=(count%10);
+ 415   3      count=(count/10);
+ 416   3      i++;
+ 417   3      }
+ 418   2      i--;
+ 419   2      for(;i>=0;i--)
+ 420   2      {
+ 421   3      writedata(s[i]+0x30);
+C51 COMPILER V9.51   MAIN                                                                  04/21/2013 20:19:36 PAGE 8   
+
+ 422   3      writecmd(0x06);
+ 423   3      }
+ 424   2      }
+ 425   1      }
+ 426          
+ 427          
+ 428          
+ 429          //------------------------------------------------Read Notification-----------------------------------
+ 430          void read_notification(void)
+ 431          {
+ 432   1        del=MyBuff[12];
+ 433   1        clear_mybuff();
+ 434   1        gsm_cmd("AT+CMGR=");
+ 435   1        transmit(del);
+ 436   1        gsm_cmd("\r");
+ 437   1        delay1(100);
+ 438   1      } 
+ 439          
+ 440          //--------------------------------------------------Definition of Clear MyBuff--------------------------
+ 441          
+ 442          void clear_mybuff(void)
+ 443          {
+ 444   1        int i;
+ 445   1        for(i=0;i<15;i++)
+ 446   1        MyBuff[i]=0;
+ 447   1      }
+ 448          
+ 449          //---------------------------------------------------- Definition of Set date Function -------------------
+             --------------
+ 450          
+ 451          /*void set_date(void)
+ 452          {
+ 453            int i=0;
+ 454            char key;
+ 455            char s[2]={0};
+ 456            char y[5]={0};
+ 457            string_print("Set Date");
+ 458            delay1(200);
+ 459            writecmd(0x01);
+ 460            string_print("Enter Day");
+ 461            writecmd(0xC0);
+ 462            while(i<3)
+ 463           {
+ 464             if(i==2)
+ 465          {
+ 466            s[i]='\0';
+ 467            i++;
+ 468            continue;
+ 469          }
+ 470           key=read_switch();
+ 471           if(key!='n' && key!='A' && key!='B' && key!='C' && key!='D' && key!='E' && key!='F')
+ 472          {
+ 473          s[i]=key;
+ 474          writedata(key);
+ 475          writecmd(0x06);
+ 476          if(i==0 && key>='4' )
+ 477          {
+ 478            writecmd(0x01);
+ 479            string_print("0 < Value < 4");
+ 480            delay1(200);
+ 481            writecmd(0x01);
+ 482            string_print("Enter Day");
+C51 COMPILER V9.51   MAIN                                                                  04/21/2013 20:19:36 PAGE 9   
+
+ 483            writecmd(0xC0);
+ 484            s[i]=0;
+ 485            i--;
+ 486          }
+ 487          if( i==1 && key>='2' && s[i-1]=='3')
+ 488          {
+ 489            writecmd(0x01);
+ 490            string_print(" Value < 2");
+ 491            delay1(200);
+ 492            writecmd(0x01);
+ 493            string_print("Enter Day");
+ 494            writecmd(0xC0);
+ 495            s[i]=0;
+ 496            i--;
+ 497            s[i]=0;
+ 498            i--;
+ 499          }
+ 500          if( i==1 && key=='0' && s[i-1]=='0')
+ 501          {
+ 502            writecmd(0x01);
+ 503            string_print(" 0 < Value");
+ 504            delay1(200);
+ 505            writecmd(0x01);
+ 506            string_print("Enter Day");
+ 507            writecmd(0xC0);
+ 508            s[i]=0;
+ 509            i--;
+ 510            s[i]=0;
+ 511            i--;
+ 512          }
+ 513          i++;
+ 514          }
+ 515          
+ 516          else if(key=='C')
+ 517          {
+ 518          writecmd(0xC0);
+ 519          for(i=0;i<3;i++)
+ 520          s[i]=0;
+ 521          i=0;
+ 522          }
+ 523          }
+ 524          day=atoi(s);
+ 525          for(i=0;i<3;i++)
+ 526          s[i]=0;
+ 527          i=0;
+ 528          writecmd(0x01);
+ 529          string_print("Enter Month");
+ 530          writecmd(0xC0);
+ 531          while(i<3)
+ 532          {
+ 533          if(i==2)
+ 534          {
+ 535            s[i]='\0';
+ 536            i++;
+ 537            continue;
+ 538          }
+ 539          key=read_switch();
+ 540          if(key!='n' && key!='A' && key!='B' && key!='C' && key!='D' && key!='E' && key!='F')
+ 541          {
+ 542          s[i]=key;
+ 543          writedata(key);
+ 544          writecmd(0x06);
+C51 COMPILER V9.51   MAIN                                                                  04/21/2013 20:19:36 PAGE 10  
+
+ 545          if(i==0 && key>='2')
+ 546          {
+ 547            writecmd(0x01);
+ 548            string_print(" Value < 2");
+ 549            delay1(200);
+ 550            writecmd(0x01);
+ 551            string_print("Enter Month");
+ 552            writecmd(0xC0);
+ 553            s[i]=0;
+ 554            i--;
+ 555          }
+ 556          
+ 557          if( i==1 && key=='0' && s[i-1]=='0')
+ 558          {
+ 559            writecmd(0x01);
+ 560            string_print(" 0 < Value");
+ 561            delay1(200);
+ 562            writecmd(0x01);
+ 563            string_print("Enter Month");
+ 564            writecmd(0xC0);
+ 565            s[i]=0;
+ 566            i--;
+ 567            s[i]=0;
+ 568            i--;
+ 569          }
+ 570          
+ 571          i++;
+ 572          }
+ 573          else if(key=='C')
+ 574          {
+ 575          writecmd(0xC0);
+ 576          for(i=0;i<3;i++)
+ 577          s[i]=0;
+ 578          i=0;
+ 579          }
+ 580          }
+ 581          month=atoi(s);
+ 582          i=0;
+ 583          writecmd(0x01);
+ 584          string_print("Enter Year");
+ 585          writecmd(0xC0);
+ 586          while(i<5)
+ 587          {
+ 588            if(i==4)
+ 589            {
+ 590              s[i]='\0';
+ 591              i++;
+ 592              continue;
+ 593            }
+ 594          key=read_switch();
+ 595          if(key!='n' && key!='A' && key!='B' && key!='C' && key!='D' && key!='E' && key!='F')
+ 596          {
+ 597          y[i]=key;
+ 598          writedata(key);
+ 599          writecmd(0x06);
+ 600          i++;
+ 601          }
+ 602          if(key=='C')
+ 603          {
+ 604          writecmd(0xC0);
+ 605          for(i=0;i<5;i++)
+ 606          s[i]=0;
+C51 COMPILER V9.51   MAIN                                                                  04/21/2013 20:19:36 PAGE 11  
+
+ 607          i=0;
+ 608          }
+ 609          }
+ 610          year=atoi(y);
+ 611          writecmd(0x01);
+ 612          }
+ 613          */
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   2337    ----
+   CONSTANT SIZE    =    266    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =     54      20
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

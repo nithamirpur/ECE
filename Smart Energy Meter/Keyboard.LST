@@ -1,0 +1,73 @@
+C51 COMPILER V9.51   KEYBOARD                                                              04/21/2013 20:19:36 PAGE 1   
+
+
+C51 COMPILER V9.51, COMPILATION OF MODULE KEYBOARD
+OBJECT MODULE PLACED IN Keyboard.OBJ
+COMPILER INVOKED BY: C:\Keil\C51\BIN\C51.EXE Keyboard.c BROWSE DEBUG OBJECTEXTEND TABS(2)
+
+line level    source
+
+   1          //#pragma compact
+   2          #include<reg51.h>
+   3          #include<delay.h>
+   4          
+   5          // Ports Assignment
+   6          
+   7          sbit RowA = P2^0;     //RowA
+   8          sbit RowB = P2^1;     //RowB
+   9          sbit RowC = P2^2;     //RowC
+  10          sbit RowD = P2^3;     //RowD
+  11          
+  12          sbit C1   = P2^4;     //Column1
+  13          sbit C2   = P2^5;     //Column2
+  14          sbit C3   = P2^6;     //Column3
+  15          sbit C4   = P2^7;     //Column4
+  16          
+  17          char read_switch(void)  
+  18          { 
+  19   1        RowA = 0; RowB = 1; RowC = 1; RowD = 1;   //Test Row A
+  20   1      
+  21   1        if (C1 == 0) { delay(10000); while (C1==0); return '0'; }
+  22   1        if (C2 == 0) { delay(10000); while (C2==0); return '1'; }
+  23   1        if (C3 == 0) { delay(10000); while (C3==0); return '2'; }
+  24   1        if (C4 == 0) { delay(10000); while (C4==0); return '3'; }
+  25   1      
+  26   1        RowA = 1; RowB = 0; RowC = 1; RowD = 1;   //Test Row B
+  27   1      
+  28   1        if (C1 == 0) { delay(10000); while (C1==0); return '4'; }
+  29   1        if (C2 == 0) { delay(10000); while (C2==0); return '5'; }
+  30   1        if (C3 == 0) { delay(10000); while (C3==0); return '6'; }
+  31   1        if (C4 == 0) { delay(10000); while (C4==0); return '7'; }
+  32   1        
+  33   1        RowA = 1; RowB = 1; RowC = 0; RowD = 1;   //Test Row C
+  34   1      
+  35   1        if (C1 == 0) { delay(10000); while (C1==0); return '8'; }
+  36   1        if (C2 == 0) { delay(10000); while (C2==0); return '9'; }
+  37   1        if (C3 == 0) { delay(10000); while (C3==0); return 'A'; }
+  38   1        if (C4 == 0) { delay(10000); while (C4==0); return 'B'; }
+  39   1        
+  40   1        RowA = 1; RowB = 1; RowC = 1; RowD = 0;   //Test Row D
+  41   1      
+  42   1        if (C1 == 0) { delay(10000); while (C1==0); return 'C'; }
+  43   1        if (C2 == 0) { delay(10000); while (C2==0); return 'D'; }
+  44   1        if (C3 == 0) { delay(10000); while (C3==0); return 'E'; }
+  45   1        if (C4 == 0) { delay(10000); while (C4==0); return 'F'; }
+  46   1      
+  47   1        return 'n';             // Means no key has been pressed
+  48   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    291    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+C51 COMPILER V9.51   KEYBOARD                                                              04/21/2013 20:19:36 PAGE 2   
+
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)
